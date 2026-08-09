@@ -18,8 +18,8 @@ func TestClientFindOffersPostsGPUNameAndReturnsTopFive(t *testing.T) {
 		if r.URL.Path != "/api/v0/bundles/" {
 			t.Fatalf("path = %s, want /api/v0/bundles/", r.URL.Path)
 		}
-		if got := r.Header.Get("Authorization"); got != "$VAST_API_KEY" {
-			t.Fatalf("Authorization = %q, want %q", got, "$VAST_API_KEY")
+		if got := r.Header.Get("Authorization"); got != "Bearer test-key" {
+			t.Fatalf("Authorization = %q, want %q", got, "Bearer test-key")
 		}
 		if err := json.NewDecoder(r.Body).Decode(&gotPayload); err != nil {
 			t.Fatalf("decode request body: %v", err)
@@ -42,7 +42,7 @@ func TestClientFindOffersPostsGPUNameAndReturnsTopFive(t *testing.T) {
 		}, nil
 	})}
 
-	client := NewClient("https://vast.test", httpClient)
+	client := NewClient("https://vast.test", httpClient, "test-key")
 	offers, err := client.FindOffers("RTX 5090")
 	if err != nil {
 		t.Fatalf("FindOffers() error = %v", err)
@@ -52,14 +52,35 @@ func TestClientFindOffersPostsGPUNameAndReturnsTopFive(t *testing.T) {
 	if gpuName != "RTX 5090" {
 		t.Fatalf("gpu_name in request = %q, want RTX 5090", gpuName)
 	}
-	if got := int(gotPayload["limit"].(float64)); got != 10 {
-		t.Fatalf("request limit = %d, want 10", got)
+	if got := int(gotPayload["limit"].(float64)); got != 5 {
+		t.Fatalf("request limit = %d, want 5", got)
+	}
+	order := gotPayload["order"].([]any)[0].([]any)
+	if order[0] != "dph_total" || order[1] != "asc" {
+		t.Fatalf("order = %#v, want dph_total ascending", order)
 	}
 	if len(offers) != 5 {
 		t.Fatalf("len(offers) = %d, want 5", len(offers))
 	}
 	if offers[0].ID != 2 || offers[4].ID != 6 {
 		t.Fatalf("offers sorted IDs start/end = %d/%d, want 2/6", offers[0].ID, offers[4].ID)
+	}
+}
+
+func TestClientFindOffersRequiresAPIKey(t *testing.T) {
+	called := false
+	httpClient := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		called = true
+		return nil, nil
+	})}
+
+	client := NewClient("https://vast.test", httpClient, "")
+	_, err := client.FindOffers("RTX 5090")
+	if err == nil {
+		t.Fatal("FindOffers() error = nil, want missing API key error")
+	}
+	if called {
+		t.Fatal("FindOffers() called HTTP transport without an API key")
 	}
 }
 

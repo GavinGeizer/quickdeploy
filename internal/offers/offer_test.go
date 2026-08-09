@@ -36,11 +36,11 @@ func TestTopCheapestParsesSortsLimitsAndFormats(t *testing.T) {
 
 	got := Format(cheapest)
 	want := strings.Join([]string{
-		"1. GPU: RTX 4090, RAM: 24GB, CPU_RAM: 8GB, CPU: AMD EPYC 4, Reliability: 99.40%, Price: $0.08/hr",
-		"2. GPU: RTX 4090, RAM: 24GB, CPU_RAM: 32GB, CPU: AMD EPYC 2, Reliability: 99.20%, Price: $0.12/hr",
-		"3. GPU: RTX 4090, RAM: 24GB, CPU_RAM: 16GB, CPU: AMD EPYC 5, Reliability: 99.50%, Price: $0.31/hr",
-		"4. GPU: RTX 4090, RAM: 24GB, CPU_RAM: 24GB, CPU: AMD EPYC 6, Reliability: 99.60%, Price: $0.44/hr",
-		"5. GPU: RTX 4090, RAM: 24GB, CPU_RAM: 48GB, CPU: AMD EPYC 3, Reliability: 99.30%, Price: $0.51/hr",
+		"1. ID: 4, GPU: RTX 4090, RAM: 24GB, CPU_RAM: 8GB, CPU: AMD EPYC 4, Reliability: 99.40%, Price: $0.08/hr",
+		"2. ID: 2, GPU: RTX 4090, RAM: 24GB, CPU_RAM: 32GB, CPU: AMD EPYC 2, Reliability: 99.20%, Price: $0.12/hr",
+		"3. ID: 5, GPU: RTX 4090, RAM: 24GB, CPU_RAM: 16GB, CPU: AMD EPYC 5, Reliability: 99.50%, Price: $0.31/hr",
+		"4. ID: 6, GPU: RTX 4090, RAM: 24GB, CPU_RAM: 24GB, CPU: AMD EPYC 6, Reliability: 99.60%, Price: $0.44/hr",
+		"5. ID: 3, GPU: RTX 4090, RAM: 24GB, CPU_RAM: 48GB, CPU: AMD EPYC 3, Reliability: 99.30%, Price: $0.51/hr",
 	}, "\n")
 
 	if got != want {

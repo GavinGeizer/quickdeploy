@@ -74,8 +74,9 @@ func Format(offers []Offer) string {
 	lines := make([]string, 0, len(offers))
 	for i, offer := range offers {
 		lines = append(lines, fmt.Sprintf(
-			"%d. GPU: %s, RAM: %.0fGB, CPU_RAM: %.0fGB, CPU: %s, Reliability: %.2f%%, Price: $%.2f/hr",
+			"%d. ID: %d, GPU: %s, RAM: %.0fGB, CPU_RAM: %.0fGB, CPU: %s, Reliability: %.2f%%, Price: $%.2f/hr",
 			i+1,
+			offer.ID,
 			offer.GPUName,
 			offer.RAMGB,
 			offer.CPURAMGB,

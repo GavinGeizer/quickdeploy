@@ -24,7 +24,7 @@ func TestRunFetchPrintsFormattedTopCheapestOffers(t *testing.T) {
 	}
 
 	got := strings.TrimSpace(out.String())
-	want := "1. GPU: RTX 5090, RAM: 32GB, CPU_RAM: 64GB, CPU: AMD EPYC, Reliability: 99.20%, Price: $0.10/hr"
+	want := "1. ID: 2, GPU: RTX 5090, RAM: 32GB, CPU_RAM: 64GB, CPU: AMD EPYC, Reliability: 99.20%, Price: $0.10/hr"
 	if got != want {
 		t.Fatalf("output = %q, want %q", got, want)
 	}

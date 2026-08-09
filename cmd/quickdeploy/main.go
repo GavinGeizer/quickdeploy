@@ -47,7 +47,7 @@ func run(args []string, out io.Writer, fetcher offerFetcher) error {
 }
 
 func main() {
-	client := vast.NewClient(vast.DefaultBaseURL, http.DefaultClient)
+	client := vast.NewClient(vast.DefaultBaseURL, http.DefaultClient, os.Getenv("VAST_API_KEY"))
 	if err := run(os.Args[1:], os.Stdout, client); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)

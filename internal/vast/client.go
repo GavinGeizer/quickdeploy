@@ -15,19 +15,25 @@ const DefaultBaseURL = "https://console.vast.ai"
 type Client struct {
 	baseURL    string
 	httpClient *http.Client
+	apiKey     string
 }
 
-func NewClient(baseURL string, httpClient *http.Client) *Client {
+func NewClient(baseURL string, httpClient *http.Client, apiKey string) *Client {
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
 	return &Client{
 		baseURL:    strings.TrimRight(baseURL, "/"),
 		httpClient: httpClient,
+		apiKey:     strings.TrimSpace(apiKey),
 	}
 }
 
 func (c *Client) FindOffers(gpuName string) ([]offers.Offer, error) {
+	if c.apiKey == "" {
+		return nil, fmt.Errorf("VAST_API_KEY is not set")
+	}
+
 	body, err := json.Marshal(map[string]any{
 		"gpu_name":    map[string][]string{"in": []string{gpuName}},
 		"num_gpus":    map[string]int{"gte": 1},
@@ -35,7 +41,8 @@ func (c *Client) FindOffers(gpuName string) ([]offers.Offer, error) {
 		"verified":    map[string]bool{"eq": true},
 		"rentable":    map[string]bool{"eq": true},
 		"type":        "ondemand",
-		"limit":       10,
+		"order":       [][]string{{"dph_total", "asc"}},
+		"limit":       5,
 	})
 	if err != nil {
 		return nil, err
@@ -46,7 +53,7 @@ func (c *Client) FindOffers(gpuName string) ([]offers.Offer, error) {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "$VAST_API_KEY") // no token for you bots
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
