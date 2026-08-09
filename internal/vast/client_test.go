@@ -84,6 +84,110 @@ func TestClientFindOffersRequiresAPIKey(t *testing.T) {
 	}
 }
 
+func TestClientDeployCreatesInstance(t *testing.T) {
+	var gotPayload struct {
+		Image string `json:"image"`
+	}
+
+	httpClient := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if r.Method != http.MethodPut {
+			t.Fatalf("method = %s, want PUT", r.Method)
+		}
+		if r.URL.Path != "/api/v0/asks/42/" {
+			t.Fatalf("path = %s, want /api/v0/asks/42/", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer test-key" {
+			t.Fatalf("Authorization = %q, want %q", got, "Bearer test-key")
+		}
+		if got := r.Header.Get("Content-Type"); got != "application/json" {
+			t.Fatalf("Content-Type = %q, want application/json", got)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&gotPayload); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Status:     "200 OK",
+			Body:       io.NopCloser(bytes.NewBufferString(`{"new_contract":"1234"}`)),
+		}, nil
+	})}
+
+	client := NewClient("https://vast.test", httpClient, "test-key")
+	instanceID, err := client.Deploy(42, "ubuntu:22.04")
+	if err != nil {
+		t.Fatalf("Deploy() error = %v", err)
+	}
+	if gotPayload.Image != "ubuntu:22.04" {
+		t.Fatalf("image = %q, want ubuntu:22.04", gotPayload.Image)
+	}
+	if instanceID != "1234" {
+		t.Fatalf("instance ID = %q, want 1234", instanceID)
+	}
+}
+
+func TestClientDeployRejectsInvalidInputBeforeRequest(t *testing.T) {
+	tests := []struct {
+		name    string
+		offerID int
+		image   string
+		apiKey  string
+	}{
+		{name: "zero offer ID", offerID: 0, image: "ubuntu:22.04", apiKey: "test-key"},
+		{name: "negative offer ID", offerID: -1, image: "ubuntu:22.04", apiKey: "test-key"},
+		{name: "blank image", offerID: 42, image: "  ", apiKey: "test-key"},
+		{name: "missing API key", offerID: 42, image: "ubuntu:22.04"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			called := false
+			httpClient := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+				called = true
+				return nil, nil
+			})}
+
+			client := NewClient("https://vast.test", httpClient, test.apiKey)
+			if _, err := client.Deploy(test.offerID, test.image); err == nil {
+				t.Fatal("Deploy() error = nil, want validation error")
+			}
+			if called {
+				t.Fatal("Deploy() called HTTP transport for invalid input")
+			}
+		})
+	}
+}
+
+func TestClientDeployRejectsInvalidResponses(t *testing.T) {
+	tests := []struct {
+		name       string
+		statusCode int
+		status     string
+		body       string
+	}{
+		{name: "API error", statusCode: http.StatusBadRequest, status: "400 Bad Request", body: `{}`},
+		{name: "malformed JSON", statusCode: http.StatusOK, status: "200 OK", body: `{`},
+		{name: "missing instance ID", statusCode: http.StatusOK, status: "200 OK", body: `{}`},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			httpClient := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+				return &http.Response{
+					StatusCode: test.statusCode,
+					Status:     test.status,
+					Body:       io.NopCloser(bytes.NewBufferString(test.body)),
+				}, nil
+			})}
+
+			client := NewClient("https://vast.test", httpClient, "test-key")
+			if _, err := client.Deploy(42, "ubuntu:22.04"); err == nil {
+				t.Fatal("Deploy() error = nil, want response error")
+			}
+		})
+	}
+}
+
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) {

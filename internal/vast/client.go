@@ -30,10 +30,6 @@ func NewClient(baseURL string, httpClient *http.Client, apiKey string) *Client {
 }
 
 func (c *Client) FindOffers(gpuName string) ([]offers.Offer, error) {
-	if c.apiKey == "" {
-		return nil, fmt.Errorf("VAST_API_KEY is not set")
-	}
-
 	body, err := json.Marshal(map[string]any{
 		"gpu_name":    map[string][]string{"in": []string{gpuName}},
 		"num_gpus":    map[string]int{"gte": 1},
@@ -48,7 +44,54 @@ func (c *Client) FindOffers(gpuName string) ([]offers.Offer, error) {
 		return nil, err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, c.baseURL+"/api/v0/bundles/", bytes.NewReader(body))
+	resp, err := c.do(http.MethodPost, "/api/v0/bundles/", body)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	decoded, err := offers.Decode(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return offers.TopCheapest(decoded, 5), nil
+}
+
+func (c *Client) Deploy(offerID int, image string) (string, error) {
+	if offerID <= 0 {
+		return "", fmt.Errorf("offer ID must be positive")
+	}
+	image = strings.TrimSpace(image)
+	if image == "" {
+		return "", fmt.Errorf("image is required")
+	}
+	body, err := json.Marshal(map[string]string{"image": image})
+	if err != nil {
+		return "", err
+	}
+	resp, err := c.do(http.MethodPut, fmt.Sprintf("/api/v0/asks/%d/", offerID), body)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		NewContract json.Number `json:"new_contract"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+	if result.NewContract == "" {
+		return "", fmt.Errorf("vast api response missing new_contract")
+	}
+	return result.NewContract.String(), nil
+}
+
+func (c *Client) do(method, path string, body []byte) (*http.Response, error) {
+	if c.apiKey == "" {
+		return nil, fmt.Errorf("VAST_API_KEY is not set")
+	}
+	req, err := http.NewRequest(method, c.baseURL+path, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -59,15 +102,9 @@ func (c *Client) FindOffers(gpuName string) ([]offers.Offer, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		resp.Body.Close()
 		return nil, fmt.Errorf("vast api returned %s", resp.Status)
 	}
-
-	decoded, err := offers.Decode(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	return offers.TopCheapest(decoded, 5), nil
+	return resp, nil
 }
