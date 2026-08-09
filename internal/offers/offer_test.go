@@ -47,3 +47,19 @@ func TestTopCheapestParsesSortsLimitsAndFormats(t *testing.T) {
 		t.Fatalf("Format() =\n%s\nwant\n%s", got, want)
 	}
 }
+
+func TestDecodeRejectsMissingOffers(t *testing.T) {
+	if _, err := Decode(strings.NewReader(`{}`)); err == nil {
+		t.Fatal("Decode() error = nil, want missing offers error")
+	}
+}
+
+func TestDecodeAcceptsEmptyOffers(t *testing.T) {
+	offers, err := Decode(strings.NewReader(`{"offers":[]}`))
+	if err != nil {
+		t.Fatalf("Decode() error = %v", err)
+	}
+	if len(offers) != 0 {
+		t.Fatalf("len(offers) = %d, want 0", len(offers))
+	}
+}

@@ -29,7 +29,7 @@ type vastOffer struct {
 }
 
 type response struct {
-	Offers []vastOffer `json:"offers"`
+	Offers *[]vastOffer `json:"offers"`
 }
 
 func Decode(r io.Reader) ([]Offer, error) {
@@ -37,9 +37,12 @@ func Decode(r io.Reader) ([]Offer, error) {
 	if err := json.NewDecoder(r).Decode(&decoded); err != nil {
 		return nil, err
 	}
+	if decoded.Offers == nil {
+		return nil, fmt.Errorf("vast api response missing offers")
+	}
 
-	offers := make([]Offer, 0, len(decoded.Offers))
-	for _, raw := range decoded.Offers {
+	offers := make([]Offer, 0, len(*decoded.Offers))
+	for _, raw := range *decoded.Offers {
 		offers = append(offers, Offer{
 			ID:          raw.ID,
 			CPUName:     strings.TrimSpace(raw.CPUName),

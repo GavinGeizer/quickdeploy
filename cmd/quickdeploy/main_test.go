@@ -105,6 +105,9 @@ func TestRunExplicitOfferOverridesFetchedOffer(t *testing.T) {
 	if gotOfferID != 42 {
 		t.Fatalf("Deploy() offer ID = %d, want explicit ID 42", gotOfferID)
 	}
+	if got := out.String(); !strings.Contains(got, "1. ID: 7") || !strings.Contains(got, "deployed instance 99 from offer 42") {
+		t.Fatalf("output = %q, want fetched offer and explicit deployment confirmation", got)
+	}
 }
 
 func TestRunDoesNotDeployWhenNoOffersFound(t *testing.T) {

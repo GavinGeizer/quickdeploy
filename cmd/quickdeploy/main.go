@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"quickdeploy/internal/offers"
 	"quickdeploy/internal/vast"
@@ -86,7 +87,7 @@ func run(args []string, out io.Writer, fetcher offerFetcher, deployer offerDeplo
 }
 
 func main() {
-	client := vast.NewClient(vast.DefaultBaseURL, http.DefaultClient, os.Getenv("VAST_API_KEY"))
+	client := vast.NewClient(vast.DefaultBaseURL, &http.Client{Timeout: 30 * time.Second}, os.Getenv("VAST_API_KEY"))
 	if err := run(os.Args[1:], os.Stdout, client, client); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)

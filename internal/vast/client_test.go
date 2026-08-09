@@ -3,8 +3,10 @@ package vast
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -59,6 +61,21 @@ func TestClientFindOffersPostsGPUNameAndReturnsTopFive(t *testing.T) {
 	if order[0] != "dph_total" || order[1] != "asc" {
 		t.Fatalf("order = %#v, want dph_total ascending", order)
 	}
+	if got := gotPayload["reliability"].(map[string]any)["gte"]; got != 0.99 {
+		t.Fatalf("minimum reliability = %v, want 0.99", got)
+	}
+	if got := gotPayload["verified"].(map[string]any)["eq"]; got != true {
+		t.Fatalf("verified filter = %v, want true", got)
+	}
+	if got := gotPayload["rentable"].(map[string]any)["eq"]; got != true {
+		t.Fatalf("rentable filter = %v, want true", got)
+	}
+	if got := gotPayload["num_gpus"].(map[string]any)["gte"]; got != float64(1) {
+		t.Fatalf("minimum GPUs = %v, want 1", got)
+	}
+	if got := gotPayload["type"]; got != "ondemand" {
+		t.Fatalf("type = %v, want ondemand", got)
+	}
 	if len(offers) != 5 {
 		t.Fatalf("len(offers) = %d, want 5", len(offers))
 	}
@@ -109,7 +126,7 @@ func TestClientDeployCreatesInstance(t *testing.T) {
 		return &http.Response{
 			StatusCode: http.StatusOK,
 			Status:     "200 OK",
-			Body:       io.NopCloser(bytes.NewBufferString(`{"new_contract":"1234"}`)),
+			Body:       io.NopCloser(bytes.NewBufferString(`{"new_contract":1234}`)),
 		}, nil
 	})}
 
@@ -164,10 +181,11 @@ func TestClientDeployRejectsInvalidResponses(t *testing.T) {
 		statusCode int
 		status     string
 		body       string
+		uncertain  bool
 	}{
 		{name: "API error", statusCode: http.StatusBadRequest, status: "400 Bad Request", body: `{}`},
-		{name: "malformed JSON", statusCode: http.StatusOK, status: "200 OK", body: `{`},
-		{name: "missing instance ID", statusCode: http.StatusOK, status: "200 OK", body: `{}`},
+		{name: "malformed JSON", statusCode: http.StatusOK, status: "200 OK", body: `{`, uncertain: true},
+		{name: "missing instance ID", statusCode: http.StatusOK, status: "200 OK", body: `{}`, uncertain: true},
 	}
 
 	for _, test := range tests {
@@ -181,10 +199,30 @@ func TestClientDeployRejectsInvalidResponses(t *testing.T) {
 			})}
 
 			client := NewClient("https://vast.test", httpClient, "test-key")
-			if _, err := client.Deploy(42, "ubuntu:22.04"); err == nil {
+			_, err := client.Deploy(42, "ubuntu:22.04")
+			if err == nil {
 				t.Fatal("Deploy() error = nil, want response error")
 			}
+			if test.uncertain && !strings.Contains(err.Error(), "deployment outcome unknown") {
+				t.Fatalf("Deploy() error = %q, want uncertain-outcome warning", err)
+			}
 		})
+	}
+}
+
+func TestClientDeployReturnsTransportError(t *testing.T) {
+	wantErr := errors.New("network failed")
+	httpClient := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return nil, wantErr
+	})}
+
+	client := NewClient("https://vast.test", httpClient, "test-key")
+	_, err := client.Deploy(42, "ubuntu:22.04")
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("Deploy() error = %v, want network failed", err)
+	}
+	if !strings.Contains(err.Error(), "deployment outcome unknown") {
+		t.Fatalf("Deploy() error = %q, want uncertain-outcome warning", err)
 	}
 }
 

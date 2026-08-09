@@ -65,13 +65,16 @@ func (c *Client) Deploy(offerID int, image string) (string, error) {
 	if image == "" {
 		return "", fmt.Errorf("image is required")
 	}
+	if c.apiKey == "" {
+		return "", fmt.Errorf("VAST_API_KEY is not set")
+	}
 	body, err := json.Marshal(map[string]string{"image": image})
 	if err != nil {
 		return "", err
 	}
 	resp, err := c.do(http.MethodPut, fmt.Sprintf("/api/v0/asks/%d/", offerID), body)
 	if err != nil {
-		return "", err
+		return "", deploymentOutcomeUnknown(offerID, err)
 	}
 	defer resp.Body.Close()
 
@@ -79,12 +82,16 @@ func (c *Client) Deploy(offerID int, image string) (string, error) {
 		NewContract json.Number `json:"new_contract"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", err
+		return "", deploymentOutcomeUnknown(offerID, err)
 	}
 	if result.NewContract == "" {
-		return "", fmt.Errorf("vast api response missing new_contract")
+		return "", deploymentOutcomeUnknown(offerID, fmt.Errorf("vast api response missing new_contract"))
 	}
 	return result.NewContract.String(), nil
+}
+
+func deploymentOutcomeUnknown(offerID int, err error) error {
+	return fmt.Errorf("deployment outcome unknown for offer %d; check Vast instances before retrying: %w", offerID, err)
 }
 
 func (c *Client) do(method, path string, body []byte) (*http.Response, error) {
